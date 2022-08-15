@@ -77,7 +77,8 @@ function main(){
 
     function catch_key(){
         if(document.querySelector('.l-gHeaderLeft__link a')){ //「トップページ」アイコンに起動表示 📛
-            document.querySelector('.l-gHeaderLeft__link a').style.background='#03a9f4'; }
+            document.querySelector('.l-gHeaderLeft__link a').style.boxShadow=
+                'rgb(3 169 244 / 50%) 0 -6px 0 inset, rgb(121 251 246) -14px 0 0 inset'; }
 
         search_box=document.querySelector('#search_box');
         editor_iframe=document.querySelector('.cke_wysiwyg_frame');
