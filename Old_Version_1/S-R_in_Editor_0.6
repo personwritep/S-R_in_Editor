@@ -1,0 +1,261 @@
+// ==UserScript==
+// @name         S-R in Editor Test
+// @namespace  http://tampermonkey.net/
+// @version      0.6
+// @description  通常編集枠で実行できる 検索 / 置換 ツール
+// @author       Ameba Blog User
+// @match        https://blog.ameba.jp/ucs/entry/srventry*
+// @grant         none
+// ==/UserScript==
+
+
+window.addEventListener('load', function(){
+    let editor_iframe;
+    let iframe_doc;
+
+    let target=document.getElementById('cke_1_contents'); // 監視 target
+    let monitor=new MutationObserver(catch_key);
+    monitor.observe(target, {childList: true}); // ショートカット待受け開始
+
+    catch_key();
+
+    function catch_key(){
+        editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+        if(editor_iframe){ // iframe読込みが実行条件
+            iframe_doc=editor_iframe.contentWindow.document;
+
+            iframe_doc.addEventListener("keydown", check_key);
+            document.addEventListener("keydown", check_key);
+
+            function check_key(event){
+                if(event.ctrlKey==true){
+                    if(event.keyCode==123){
+                        event.preventDefault();
+                        search_replace(); }}
+            } // check_key
+        }} // catch_key
+
+
+    function search_replace(){
+        let i_body=document.querySelector('body.l-body');
+        let editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+        let iframe_doc=editor_iframe.contentWindow.document;
+        let iframe_html=iframe_doc.querySelector('html');
+        let iframe_body=iframe_doc.querySelector('.cke_editable');
+        let insert_node;
+
+        let css=
+            '#s_container {position: fixed; top: 12px; left: calc(50% - 490px); background: #fff; '+
+            'border: 1px solid #aaa; border-radius: 4px; padding: 6px 15px; min-width: 948px; z-index: 10;}'+
+            '::placeholder {font-size: 15px; color: #bbb;}'+
+            '#s_container input {font-size: 16px; padding: 2px 6px 0;}'+
+            '#result {display: inline-block; min-width: 12px; padding: 4px 6px 2px; '+
+            'margin-left: 4px; border: 1px solid #aaa; font-size: 16px;}'+
+            '.s_toggle {display: inline-block; vertical-align: -9px; font-size: 15px; '+
+            'padding: 5px 8px 2px; border: 1px solid #aaa; overflow: hidden;}'+
+            '.s_toggle.s_1 {margin-left: 15px; min-width: 4em;}'+
+            '.s_toggle.s_2 {margin: 0 5px 0 15px; visibility: hidden;}'+
+            '#r_select {position: relative; width: 0; opacity: 0.6; box-shadow: 0 0 0 6em #fff;}'+
+            '#r_select:checked {opacity: 1; box-shadow: 0 0 0 6em #d2eff4; z-index: -1;}'+
+            '#replace_box {visibility: hidden;}'+
+            '.s_radio {font-size: 15px; line-height: 16px; padding-left: 10px; visibility: hidden;}'+
+            '.s_radio input{vertical-align: -2px; margin-left: 12px;}';
+
+        let style_tag=document.createElement("style");
+        style_tag.type="text/css";
+        style_tag.setAttribute("class", "ep");
+        style_tag.appendChild(iframe_doc.createTextNode(css));
+        if(i_body.querySelector('.ep')){
+            i_body.querySelector('.ep').remove(); }
+        i_body.appendChild(style_tag);
+
+        let css_iframe='.cke_editable m {background: #ffcc00;}'; // mタグの背景色指定
+
+        let style_tag_iframe=iframe_doc.createElement("style");
+        style_tag_iframe.type="text/css";
+        style_tag_iframe.setAttribute("class", "ep");
+        style_tag_iframe.appendChild(document.createTextNode(css_iframe));
+        if(iframe_html.querySelector('.ep')){
+            iframe_html.querySelector('.ep').remove(); }
+        iframe_html.appendChild(style_tag_iframe);
+
+        let insert_node_d;
+        let native_line;
+
+        if(!document.querySelector('#s_container')){ //#s_containerが無い場合 生成して開始
+            native_line=iframe_html.scrollTop; // 通常表示のスクロール位置を記録
+
+            insert_node_d=document.createElement('div');
+            insert_node_d.setAttribute('id', 's_container');
+            i_body.appendChild(insert_node_d);
+            insert_node_d.innerHTML=
+                '<input id="search_box" size="20" placeholder="検索文字">'+
+                '<span id="result">　</span>'+
+                '<span class="s_toggle s_1">　</span>'+
+                '<label for="r_select" class="s_toggle s_2">'+
+                '<input id="r_select" type="checkbox">置換</label>'+
+                '<input id="replace_box" size="20" placeholder="置換文字">'+
+                '<span class="s_radio"><input name="t_select" type="radio">一括処理'+
+                '<input name="t_select" type="radio">順次</span>';
+
+
+            let s_container=document.querySelector('#s_container');
+            let sertch_box=document.querySelector('#search_box');
+            let search_word;
+            let result_box=document.querySelector('#result');
+            let s_1=document.querySelector('.s_1');
+            let s_2=document.querySelector('.s_2');
+            let r_select=document.querySelector('#r_select')
+            let replace_box=document.querySelector('#replace_box');
+            let replace_word;
+            let s_radio=document.querySelector('.s_radio');
+            let t_select=document.getElementsByName('t_select');
+            t_select[0].checked=true;
+            let count_t, count_h, t_index;
+            let buffer;
+
+            sertch_box.focus();
+
+            sertch_box.onkeypress=function(event){ // 🔽 検索ツール操作の開始点
+
+                if(event.keyCode==13){
+                    search_word=sertch_box.value;
+                    get_search(); // bufferを取得する
+                    rbox_disp(); }} // bufferをリセットする
+
+
+            function searchNodes(root){ // 全子孫ノードリストを作成
+                var list = [];
+                var search = function (node){
+                    while (node != null){
+                        list.push(node);
+                        search(node.firstChild);
+                        node = node.nextSibling; }}
+                search(root.firstChild);
+                return list; }
+
+
+            function get_search(){
+                buffer=iframe_body.innerHTML; // ハイライト表示のためソースコードを保存 🟦
+
+                let childs=searchNodes(iframe_body);
+                count_t=0; // テキストノードのヒット数
+                let result_t
+                for(let k=0; k<childs.length; k++){
+                    if(childs[k].nodeType==3){
+                        result_t=childs[k].textContent.match(new RegExp(search_word, 'g'));
+                        if(result_t){
+                            count_t+=result_t.length; }}}
+                count_h=0; // HTMLソース全体のヒット数
+                let result_h=iframe_body.innerHTML.match(new RegExp(search_word, 'g'));
+                if(result_h){
+                    count_h=result_h.length; }}
+
+
+            function rbox_disp(){
+                r_select.checked=false;
+                replace_box.value='';
+
+                if(count_t!=0 && count_h-count_t==0){
+                    s_1.textContent='TEXT処理';
+                    s_1.style.color='#000';
+                    s_2.style.visibility='visible';
+                    replace_box.style.visibility='visible';
+                    highlight(); }
+
+                if(count_t!=0 && count_h-count_t!=0){
+                    result_box.textContent='T:'+count_t+' H:'+(count_h-count_t);
+                    s_1.textContent='処理不能';
+                    s_1.style.color='red';
+                    s_2.style.visibility='hidden';
+                    replace_box.style.visibility='hidden';
+                    s_radio.style.visibility='hidden'; }
+
+                if(count_t==0 && count_h-count_t!=0){
+                    result_box.textContent='H:'+(count_h-count_t);
+                    s_1.textContent='HTML処理';
+                    s_1.style.color='#000';
+                    s_2.style.visibility='visible';
+                    replace_box.style.visibility='visible'; }
+
+                if(count_t==0 && count_h-count_t==0){
+                    result_box.textContent='T:'+count_t+' H:'+(count_h-count_t);
+                    s_1.textContent='　- - -　';
+                    s_1.style.color='#000';
+                    s_2.style.visibility='hidden';
+                    replace_box.style.visibility='hidden';
+                    s_radio.style.visibility='hidden'; }}
+
+
+            function highlight(){
+                replace_word='<m>'+ sertch_box.value +'</m>';
+                iframe_body.innerHTML=
+                    iframe_body.innerHTML.replace(new RegExp(search_word, 'g'), replace_word);
+                let mark=iframe_body.querySelectorAll('m');
+
+                iframe_body.focus();
+                let k=0;
+                let flag=1;
+                view(0);
+                result_box.textContent='T:'+count_t+'│1';
+                while(k<mark.length && flag==1){
+                    k=next(k); }
+
+
+                function next(k){
+                    iframe_doc.addEventListener("keydown", check_key);
+                    function check_key(event){
+                        if(flag==1){
+                            if(event.keyCode==37 || event.keyCode==38){ //「←」「↑」
+                                event.preventDefault();
+                                if(k>0){
+                                    k=k-1; }
+                                result_box.textContent='T:'+count_t+'│'+(k+1);
+                                view(k);
+                                return k; }
+                            if(event.keyCode==39 || event.keyCode==40){ //「→」「↓」
+                                event.preventDefault();
+                                if(k<mark.length -1){
+                                    k+=1; }
+                                result_box.textContent='T:'+count_t+'│'+(k+1);
+                                view(k);
+                                return k; }
+                            if(event.keyCode==13 || event.keyCode==27 ){ //「Enter」「Esc」
+                                event.preventDefault();
+                                sertch_box.focus(); }
+                            else{
+                                event.preventDefault();
+                                replace_box.focus();
+                                replace_box.blur();
+                                setTimeout( function(){
+                                    sertch_box.focus();
+                                    replace_box.value=''; },500); }}}
+
+                    sertch_box.onfocus=function(){
+                        if(flag==1){
+                            result_box.textContent='T:'+count_t+'│-';
+                            iframe_html.scrollTop=native_line; // 検索開始位置に戻る
+                            iframe_body.innerHTML=buffer; // highlight を抜ける時はリセット ⏹
+                            flag=0; }}}
+
+
+                function view(k){
+                    mark[k].scrollIntoView();
+                    i_body.scrollIntoView(); }
+
+                iframe_doc.addEventListener("click", stop_out); // 編集画面のクリックで巡回終了
+                function stop_out(){
+                    if(flag==1){ // 巡回ループ内の場合
+                        native_line=iframe_html.scrollTop; // クリックした場所をスクロール位置に指定
+                        iframe_body.innerHTML=buffer; // highlight を抜ける時はリセット ⏹
+                        flag=0;
+                    }}} // highlight()
+        } // #s_container が無い場合「Ctrl+F12」で開始
+
+        else{ // #s_container がある場合は「Ctrl+F12」で終了
+            document.querySelector('#s_container').remove(); }
+
+
+
+    } // search_replace()
+})
