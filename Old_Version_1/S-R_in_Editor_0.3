@@ -1,0 +1,64 @@
+// ==UserScript==
+// @name         S-R in Editor Test
+// @namespace  http://tampermonkey.net/
+// @version      0.3
+// @description  通常編集枠で実行できる 検索 / 置換 ツール
+// @author       Ameba Blog User
+// @match        https://blog.ameba.jp/ucs/entry/srventry*
+// @grant         none
+// ==/UserScript==
+
+
+window.addEventListener('load', function(){
+
+    let target=document.getElementById('cke_1_contents'); // 監視 target
+    let monitor=new MutationObserver(catch_key);
+    monitor.observe(target, {childList: true}); // ショートカット待受け開始
+
+    catch_key();
+
+    function catch_key(){
+        let editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+        if(editor_iframe){ // iframe読込みが実行条件
+            let iframe_doc=editor_iframe.contentWindow.document;
+
+            iframe_doc.addEventListener("keydown", check_key);
+            function check_key(event){
+                if(event.ctrlKey==true){
+                    if(event.keyCode==123){
+                        event.preventDefault();
+                        search_replace(); }}
+            } // check_key
+        }} // catch_key
+
+
+    function search_replace(){
+        let editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+        let iframe_doc=editor_iframe.contentWindow.document;
+        let iframe_html=iframe_doc.querySelector('html');
+        let iframe_body=iframe_doc.querySelector('.cke_editable');
+
+        function　searchNodes(root){ // 全ノードを配列に取得する
+            let list = [];
+            let search = function (node){
+                while (node != null){
+                    list.push(node);
+                    search(node.firstChild);
+                    node = node.nextSibling; }}
+            search(root.firstChild);
+            return list; }
+
+        let childs2=searchNodes(iframe_body);
+        alert('親ノードの全ノード数：'+ childs2.length + '\n\n'
+              + iframe_body.innerHTML); // 記事のHTMLを表示
+
+        for(let k=0; k<childs2.length; k++){ // 全ての個別ノード内容を表示
+            let node_disp;
+            if(childs2[k].nodeType==3){
+                node_disp=childs2[k].textContent; }
+            else{
+                node_disp=childs2[k].outerHTML; }
+            alert(childs2[k].nodeName +'\n'+ node_disp); }
+
+    } // search_replace()
+})
