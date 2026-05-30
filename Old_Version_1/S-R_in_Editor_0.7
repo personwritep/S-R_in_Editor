@@ -1,0 +1,393 @@
+// ==UserScript==
+// @name         S-R in Editor
+// @namespace  http://tampermonkey.net/
+// @version      0.7
+// @description  通常編集枠で実行できる 検索 / 置換 ツール
+// @author       Ameba Blog User
+// @match        https://blog.ameba.jp/ucs/entry/srventry*
+// @grant         none
+// ==/UserScript==
+
+
+window.addEventListener('load', function(){
+    let editor_iframe;
+    let iframe_doc;
+    let t_flag, h_flag;
+
+    let target=document.getElementById('cke_1_contents'); // 監視 target
+    let monitor=new MutationObserver(catch_key);
+    monitor.observe(target, {childList: true}); // ショートカット待受け開始
+
+    catch_key();
+
+    function catch_key(){
+        editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+        if(editor_iframe){ //「通常表示」のみ起動
+            let search_box=document.querySelector('#search_box');
+            if(search_box){
+                search_box.disabled=false; }
+
+            iframe_doc=editor_iframe.contentWindow.document;
+            iframe_doc.addEventListener("keyup", check_key);
+            document.addEventListener("keyup", check_key);
+
+            function check_key(event){
+                if(event.ctrlKey==true){
+                    if(event.keyCode==123){
+                        event.preventDefault();
+                        if(h_flag!=1){ // HTML置換時はショートカット無効にする
+                            search_replace(); }}}}}
+
+        else{ //「HTML表示」の場合
+            let search_box=document.querySelector('#search_box');
+            search_box.disabled=true;
+            let result_box=document.querySelector('#result');
+            result_box.textContent='　';
+            let s_1=document.querySelector('.s_1');
+            s_1.style.display='none';
+            let s_2=document.querySelector('.s_2');
+            s_2.style.display='none';
+            let replace_box=document.querySelector('#replace_box');
+            replace_box.style.display='none';
+            replace_box.value='';
+            let s_radio=document.querySelector('.s_radio');
+            s_radio.style.display='none'; }
+    } // catch_key
+
+
+    function search_replace(){
+        let i_body=document.querySelector('body.l-body');
+        let editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+        let iframe_doc=editor_iframe.contentWindow.document;
+        let iframe_html=iframe_doc.querySelector('html');
+        let iframe_body=iframe_doc.querySelector('.cke_editable');
+        let insert_node;
+
+        let css=
+            '#s_container {position: fixed; top: 12px; left: calc(50% - 490px); background: #fff; '+
+            'border: 1px solid #aaa; border-radius: 4px; padding: 6px 15px; min-width: 948px; z-index: 10;}'+
+            '::placeholder {font-size: 15px; color: #bbb;}'+
+            '#s_container input:disabled {color: #000; background: #eef1f3;}'+
+            '#s_container input {font-size: 16px; padding: 2px 6px 0;}'+
+            '#result {display: inline-block; min-width: 12px; padding: 4px 6px 2px; '+
+            'margin-left: 4px; border: 1px solid #aaa; font-size: 16px;}'+
+            '.s_sw {display: inline-block; vertical-align: -9px; font-size: 15px; '+
+            'padding: 5px 8px 2px; border: 1px solid #aaa; overflow: hidden;}'+
+            '.s_1 {margin-left: 15px; min-width: 4em; display: none;}'+
+            '.s_2 {margin: 0 5px 0 15px; cursor: pointer; display: none;}'+
+            '.s_3, .s_4 {margin-left: 5px; color:#fff; background: #1e88e5; '+
+            'cursor: pointer; display: none;}'+
+            '#r_select {position: relative; width: 0; opacity: 0.6; box-shadow: 0 0 0 6em #fff;}'+
+            '#r_select:checked {opacity: 1; box-shadow: 0 0 0 6em #d2eff4; z-index: -1;}'+
+            '#replace_box {display: none;}'+
+            '.s_radio {font-size: 15px; line-height: 16px; padding-left: 10px; display: none;}'+
+            '.s_radio input{vertical-align: -2px; margin-left: 12px;}'+
+            '.js_cover {position: fixed; top: 0; width: 100%; height: 100%; '+
+            'background: rgba(0, 0, 0, .6); z-index: 10; display: none;}';
+
+        let style_tag=document.createElement("style"); // css設定styleタグ
+        style_tag.type="text/css";
+        style_tag.setAttribute("class", "ep");
+        style_tag.appendChild(iframe_doc.createTextNode(css));
+        if(i_body.querySelector('.ep')){
+            i_body.querySelector('.ep').remove(); }
+        i_body.appendChild(style_tag);
+
+        let js_cover=document.createElement("div"); // クリック操作のブロックカバー
+        js_cover.setAttribute("class", "js_cover");
+        if(i_body.querySelector('.js_cover')){
+            i_body.querySelector('.js_cover').remove(); }
+        document.querySelector('#js-container').appendChild(js_cover);
+
+        let css_iframe='.cke_editable m {background: #ffcc00;}'; // mタグの背景色指定
+
+        let style_tag_iframe=iframe_doc.createElement("style");
+        style_tag_iframe.type="text/css";
+        style_tag_iframe.setAttribute("class", "ep");
+        style_tag_iframe.appendChild(document.createTextNode(css_iframe));
+        if(iframe_html.querySelector('.ep')){
+            iframe_html.querySelector('.ep').remove(); }
+        iframe_html.appendChild(style_tag_iframe);
+
+        if(!document.querySelector('#s_container')){ //#s_containerが無い場合 生成して開始
+            let native_line=iframe_html.scrollTop; // 通常表示のスクロール位置を記録
+
+            let insert_node_d=document.createElement('div');
+            insert_node_d.setAttribute('id', 's_container');
+            i_body.appendChild(insert_node_d);
+            insert_node_d.innerHTML=
+                '<input id="search_box" size="20" placeholder="検索文字" autocomplete="off">'+
+                '<span id="result">　</span>'+
+                '<span class="s_sw s_1">　</span>'+
+                '<label for="r_select" class="s_sw s_2">'+
+                '<input id="r_select" type="checkbox">置換</label>'+
+                '<input id="replace_box" size="20" placeholder="置換文字" autocomplete="off">'+
+                '<span class="s_radio"><input name="t_select" type="radio">一括処理'+
+                '<input name="t_select" type="radio">順次</span>'+
+                '<span><span class="s_sw s_3">OK</span>'+
+                '<span class="s_sw s_4">UNDO</span></span>';
+
+            let s_container=document.querySelector('#s_container');
+            let search_box=document.querySelector('#search_box');
+            let search_word;
+            let result_box=document.querySelector('#result');
+            let s_1=document.querySelector('.s_1');
+            let s_2=document.querySelector('.s_2');
+            let r_select=document.querySelector('#r_select')
+            let replace_box=document.querySelector('#replace_box');
+            let replace_word;
+            let s_radio=document.querySelector('.s_radio');
+            let t_select=document.getElementsByName('t_select');
+            t_select[0].checked=true;
+            let s_3=document.querySelector('.s_3');
+            let s_4=document.querySelector('.s_4');
+            let cke_1_contents=document.querySelector('#cke_1_contents');
+            let count_t, count_h, t_index;
+            let buffer;
+
+
+            search_box.focus();
+            search_box.onkeydown=function(event){ // 🔽 検索ツール操作の開始点
+                if(event.keyCode==13){
+                    search_word=search_box.value;
+                    get_search(); // bufferを取得する
+                    rbox_disp(); }} // bufferをリセットする
+
+
+            function get_search(){
+                editor_iframe=document.querySelector('.cke_wysiwyg_frame'); // ここで取得
+                if(editor_iframe){ //「通常表示」が実行条件
+                    iframe_doc=editor_iframe.contentWindow.document;
+                    iframe_body=iframe_doc.querySelector('.cke_editable');
+
+                    buffer=iframe_body.innerHTML; // ハイライト表示のためソースコードを保存 🟦
+
+                    let childs=searchNodes(iframe_body);
+                    count_t=0; // テキストノードのヒット数
+                    let result_t
+                    for(let k=0; k<childs.length; k++){
+                        if(childs[k].nodeType==3){
+                            result_t=childs[k].textContent.match(new RegExp(search_word, 'g'));
+                            if(result_t){
+                                count_t+=result_t.length; }}}
+                    count_h=0; // HTMLソース全体のヒット数
+                    let result_h=iframe_body.innerHTML.match(new RegExp(search_word, 'g'));
+                    if(result_h){
+                        count_h=result_h.length; }}}
+
+            function searchNodes(root){ // 全子孫ノードリストを作成
+                var list = [];
+                var search = function (node){
+                    while (node != null){
+                        list.push(node);
+                        search(node.firstChild);
+                        node = node.nextSibling; }}
+                search(root.firstChild);
+                return list; }
+
+            function rbox_disp(){
+                r_select.checked=false;
+                search_box.disabled=false;
+                replace_box.disabled=false;
+                replace_box.value='';
+                h_flag=0;
+
+                if(count_t!=0 && count_h-count_t==0){
+                    s_1.textContent='TEXT処理';
+                    s_1.style.display='inline-block';
+                    s_1.style.color='#000';
+                    s_2.style.display='inline-block';
+                    replace_box.style.display='none';
+                    s_radio.style.display='none';
+                    s_3.style.display='none';
+                    s_4.style.display='none';
+                    highlight(); }
+
+                if(count_t!=0 && count_h-count_t!=0){
+                    result_box.textContent='T:'+count_t+' H:'+(count_h-count_t);
+                    s_1.textContent='処理不能';
+                    s_1.style.display='inline-block';
+                    s_1.style.color='red';
+                    s_2.style.display='none';
+                    replace_box.style.display='none';
+                    s_radio.style.display='none';
+                    s_3.style.display='none';
+                    s_4.style.display='none'; }
+
+                if(count_t==0 && count_h-count_t!=0){
+                    result_box.textContent='H:'+(count_h-count_t);
+                    s_1.textContent='HTML処理';
+                    s_1.style.display='inline-block';
+                    s_1.style.color='#000';
+                    s_2.style.display='inline-block';
+                    replace_box.style.display='none';
+                    s_radio.style.display='none';
+                    s_3.style.display='none';
+                    s_4.style.display='none';
+                    html_replace(); }
+
+                if(count_t==0 && count_h-count_t==0){
+                    result_box.textContent='T:'+count_t+' H:'+(count_h-count_t);
+                    s_1.textContent='　- - -　';
+                    s_1.style.display='inline-block';
+                    s_1.style.color='#000';
+                    s_2.style.display='none';
+                    replace_box.style.display='none';
+                    s_radio.style.display='none';
+                    s_3.style.display='none';
+                    s_4.style.display='none'; }}
+
+
+            function highlight(){
+                replace_word='<m>'+ search_box.value +'</m>';
+                iframe_body.innerHTML=
+                    iframe_body.innerHTML.replace(new RegExp(search_word, 'g'), replace_word);
+                let mark=iframe_body.querySelectorAll('m');
+
+                iframe_body.focus();
+                let k=0;
+                view(0);
+                result_box.textContent='T:'+count_t+'│1';
+
+                t_flag=1;
+                while(k<mark.length && t_flag==1){
+                    k=next(k); }
+
+                function next(k){
+                    iframe_doc.addEventListener("keydown", check_key);
+                    function check_key(event){
+                        if(t_flag==1){
+                            if(event.keyCode==37 || event.keyCode==38){ //「←」「↑」
+                                event.preventDefault();
+                                if(k>0){
+                                    k=k-1; }
+                                result_box.textContent='T:'+count_t+'│'+(k+1);
+                                view(k);
+                                return k; }
+                            if(event.keyCode==39 || event.keyCode==40){ //「→」「↓」
+                                event.preventDefault();
+                                if(k<mark.length -1){
+                                    k+=1; }
+                                result_box.textContent='T:'+count_t+'│'+(k+1);
+                                view(k);
+                                return k; }
+                            if(event.keyCode==13 || event.keyCode==27 ){ //「Enter」「Esc」
+                                event.preventDefault();
+                                search_box.focus(); }
+                            else{
+                                event.preventDefault();
+                                search_box.focus();
+                                setTimeout( function(){
+                                    let keyEvent=new KeyboardEvent('keydown', {keyCode: 8});
+                                    search_box.dispatchEvent(keyEvent);
+                                },200);
+                                setTimeout( function(){
+                                    let keyEvent=new KeyboardEvent('keydown', {keyCode: 27});
+                                    search_box.dispatchEvent(keyEvent);
+                                },300);
+                                setTimeout( function(){
+                                    search_box.value=search_word;
+                                },400); }}}
+
+                    search_box.onfocus=function(){
+                        if(t_flag==1){
+                            result_box.textContent='T:'+count_t+'│-';
+                            iframe_html.scrollTop=native_line; // 検索開始位置に戻る
+                            iframe_body.innerHTML=buffer; // highlight を抜ける時はリセット ⏹
+                            t_flag=0; }}}
+
+                function view(k){
+                    mark[k].scrollIntoView();
+                    i_body.scrollIntoView(); }
+
+                iframe_doc.addEventListener("click", stop_out); // 編集画面のクリックで巡回終了
+                function stop_out(){
+                    if(t_flag==1){ // 巡回ループ内の場合
+                        native_line=iframe_html.scrollTop; // クリックした場所をスクロール位置に指定
+                        iframe_body.innerHTML=buffer; // highlight を抜ける時はリセット ⏹
+                        t_flag=0; }}
+            } // highlight()
+
+
+            function html_replace(){ // HTML置換処理
+                r_select.onclick=function(){
+                    if(r_select.checked){
+                        replace_box.style.display='inline-block';
+                        replace_box.focus(); }
+                    else{
+                        replace_box.style.display='none';
+                        replace_box.value=''; }}
+
+                buffer=iframe_body.innerHTML; // HTML置換の処理前のソースコード保存 🟦
+                replace_box.focus();
+                html_roop();
+
+                function html_roop(){
+                    replace_box.onkeyup=function(event){ // 🔽 置換操作の開始点
+                        if(event.keyCode==13 && r_select.checked){
+                            replace_word=replace_box.value;
+                            iframe_body.innerHTML=
+                                iframe_body.innerHTML.replace(new RegExp(search_word, 'g'), replace_word);
+                            js_cover.style.display='block';
+                            cke_1_contents.style.zIndex='11';
+                            editor_iframe.style.pointerEvents='none'; // 編集不可にする
+                            s_2.style.cursor='default';
+                            r_select.disabled=true;
+                            search_box.disabled=true;
+                            replace_box.disabled=true;
+                            s_3.style.display='inline-block';
+                            s_4.style.display='inline-block';
+                            h_flag=1; }
+
+                        if(event.keyCode==17 || event.keyCode==27){ //「Esc」「Ctrl」でループを出る
+                            s_2.style.cursor='pointer';
+                            r_select.disabled=false;
+                            search_box.disabled=false;
+                            replace_box.disabled=false;
+                            r_select.checked=false;
+                            replace_box.style.display='none';
+                            replace_box.value='';
+                            iframe_body.innerHTML=buffer; // 置換処理をUNDO ⏹
+                            search_box.focus();
+                            h_flag=0; }}
+
+                    s_3.onclick=function(){
+                        js_cover.style.display='none';
+                        cke_1_contents.style.zIndex='0';
+                        editor_iframe.style.pointerEvents='auto';
+                        s_2.style.cursor='pointer';
+                        r_select.disabled=false;
+                        search_box.disabled=false;
+                        replace_box.disabled=false;
+                        result_box.textContent='H:　'; // 検索結果は変更される
+                        s_1.style.display='none';
+                        s_2.style.display='none';
+                        r_select.checked=false;
+                        replace_box.style.display='none';
+                        replace_box.value='';
+                        s_3.style.display='none';
+                        s_4.style.display='none';
+                        search_box.focus();
+                        h_flag=0; }
+
+                    s_4.onclick=function(){
+                        js_cover.style.display='none';
+                        cke_1_contents.style.zIndex='0';
+                        editor_iframe.style.pointerEvents='auto';
+                        s_2.style.cursor='pointer';
+                        r_select.disabled=false;
+                        search_box.disabled=false;
+                        replace_box.disabled=false;
+                        s_3.style.display='none';
+                        s_4.style.display='none';
+                        iframe_body.innerHTML=buffer; // 置換処理をUNDO ⏹
+                        replace_box.focus();
+                        h_flag=0; }
+                } // html_roop()
+            } // html_replace()
+        } // #s_container が無い場合「Ctrl+F12」で開始
+
+        else{ // #s_container がある場合は「Ctrl+F12」で終了
+            document.querySelector('#s_container').remove(); }
+    } // search_replace()
+})
