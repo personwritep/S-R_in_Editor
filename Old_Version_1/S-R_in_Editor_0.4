@@ -1,0 +1,163 @@
+// ==UserScript==
+// @name         S-R in Editor Test
+// @namespace  http://tampermonkey.net/
+// @version      0.4
+// @description  通常編集枠で実行できる 検索 / 置換 ツール
+// @author       Ameba Blog User
+// @match        https://blog.ameba.jp/ucs/entry/srventry*
+// @grant         none
+// ==/UserScript==
+
+
+window.addEventListener('load', function(){
+    let editor_iframe;
+    let iframe_doc;
+
+    let target=document.getElementById('cke_1_contents'); // 監視 target
+    let monitor=new MutationObserver(catch_key);
+    monitor.observe(target, {childList: true}); // ショートカット待受け開始
+
+    catch_key();
+
+    function catch_key(){
+        editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+        if(editor_iframe){ // iframe読込みが実行条件
+            iframe_doc=editor_iframe.contentWindow.document;
+
+            iframe_doc.addEventListener("keydown", check_key);
+            document.addEventListener("keydown", check_key);
+
+            function check_key(event){
+                if(event.ctrlKey==true){
+                    if(event.keyCode==123){
+                        event.preventDefault();
+                        search_replace(); }}
+            } // check_key
+        }} // catch_key
+
+
+    function search_replace(){
+        let i_body=document.querySelector('body.l-body');
+        let editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+        let iframe_doc=editor_iframe.contentWindow.document;
+        let iframe_html=iframe_doc.querySelector('html');
+        let iframe_body=iframe_doc.querySelector('.cke_editable');
+        let insert_node;
+
+        let css=
+            '#serch_box { position: fixed; top: 12px; left: calc(50% - 490px); background: #fff; '+
+            'border: 1px solid #aaa; border-radius: 4px; padding: 6px 4px; width: 971px; z-index: 10;}'+
+            '#serch_box input { font-size: 16px; padding: 2px 6px 0;} #serch_box label { width: 2.1em; '+
+            'display: inline-block; line-height: 14px; vertical-align: -6px; padding: 0 4px 0 12px;}'+
+            '#result{ display: inline-block; min-width: 12px; padding: 4px 4px 2px; margin-left: 4px;'+
+            'border: 1px solid #aaa; font-size: 16px;}'+
+            '.s_radio { font-size: 15px; line-height: 16px; padding-left: 10px;}'+
+            '.s_radio input{ vertical-align: -2px; margin-left: 12px;}';
+
+        let style_tag=document.createElement("style");
+        style_tag.type="text/css";
+        style_tag.setAttribute("class", "ep");
+        style_tag.appendChild(iframe_doc.createTextNode(css));
+        if(i_body.querySelector('.ep')){
+            i_body.querySelector('.ep').remove(); }
+        i_body.appendChild(style_tag);
+
+        let css_iframe='.cke_editable m { background: #ffcc00; }';
+
+        let style_tag_iframe=iframe_doc.createElement("style");
+        style_tag_iframe.type="text/css";
+        style_tag_iframe.setAttribute("class", "ep");
+        style_tag_iframe.appendChild(document.createTextNode(css_iframe));
+        if(iframe_html.querySelector('.ep')){
+            iframe_html.querySelector('.ep').remove(); }
+        iframe_html.appendChild(style_tag_iframe);
+
+        let insert_node_d;
+        insert_node_d=document.createElement('div');
+        insert_node_d.setAttribute('id', 'serch_box');
+        i_body.appendChild(insert_node_d);
+        insert_node_d.innerHTML=
+            '<label for="textInput">検索文字</label><input id="search_word" size="20">'+
+            '<span id="result"></span>'+
+            '<span class="s_radio"><input name="r_select" type="radio">置換</span>'+
+            '<label for="textInput">置換文字</label><input id="replace_word" size="20">'+
+            '<span class="s_radio"><input name="t_select" type="radio">一括処理'+
+            '<input name="t_select" type="radio">順次</span>'+
+            '<span class="s_radio"><input name="u_select" type="radio">HTMLを処理</span>';
+
+
+/*
+        function　searchNodes(root){ // 全ノードを配列に取得する
+            let list = [];
+            let search = function (node){
+                while (node != null){
+                    list.push(node);
+                    search(node.firstChild);
+                    node = node.nextSibling; }}
+            search(root.firstChild);
+            return list; }
+
+        let childs2=searchNodes(iframe_body);
+        alert('親ノードの全ノード数：'+ childs2.length + '\n\n'
+              + iframe_body.innerHTML); // 記事のHTMLを表示
+
+        for(let k=0; k<childs2.length; k++){ // 全ての個別ノード内容を表示
+            let node_disp;
+            if(childs2[k].nodeType==3){
+                node_disp=childs2[k].textContent; }
+            else{
+                node_disp=childs2[k].outerHTML; }
+
+            alert(childs2[k].nodeName +'\n'+ node_disp); }
+*/
+
+
+        let mark=iframe_body.querySelectorAll('m');
+        alert(mark.length);
+
+        let native_line=iframe_html.scrollTop; // 通常表示のスクロール位置を記録
+        let k=0;
+        let flag=1;
+        view(0);
+        while(k<mark.length){
+            k=next(k); }
+
+        function next(k){
+
+            iframe_doc.addEventListener("keydown", check_key);
+            function check_key(event){
+
+                if(flag==1){
+                    if(event.shiftKey==true && event.keyCode==13){
+                        event.preventDefault();
+                        if(k>0){
+                            k=k-1; }
+                        view(k);
+                        return k; }
+                    if(event.shiftKey==true){
+                        event.preventDefault();
+                        return k; }
+                    if(event.keyCode==13){
+                        event.preventDefault();
+                        if(k<mark.length -1){
+                            k+=1; }
+                        view(k);
+                        return k; }
+                    else{
+                        event.preventDefault();
+                        iframe_html.scrollTop=native_line;
+                        flag=0; }}}}
+
+        function view(k){
+            mark[k].scrollIntoView();
+            i_body.scrollIntoView(); }
+
+
+        iframe_doc.addEventListener("click", stop_out);
+        function stop_out(){
+            if(flag==1){
+                native_line=iframe_html.scrollTop;
+                flag=0; }}
+
+    } // search_replace()
+})
