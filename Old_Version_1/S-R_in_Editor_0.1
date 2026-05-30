@@ -1,0 +1,111 @@
+// ==UserScript==
+// @name         S-R in Editor
+// @namespace  http://tampermonkey.net/
+// @version      0.1
+// @description  通常編集枠で実行できる 検索 / 置換 ツール
+// @author       Ameba Blog User
+// @match        https://blog.ameba.jp/ucs/entry/srventry*
+// @grant         none
+// ==/UserScript==
+
+
+window.addEventListener('load', function(){
+
+    let target=document.getElementById('cke_1_contents'); // 監視 target
+    let monitor=new MutationObserver(catch_key);
+    monitor.observe(target, {childList: true}); // ショートカット待受け開始
+
+    catch_key();
+
+    function catch_key(){
+        let editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+        if(editor_iframe){ // iframe読込みが実行条件
+            let iframe_doc=editor_iframe.contentWindow.document;
+
+            iframe_doc.addEventListener("keydown", check_key);
+            function check_key(event){
+                if(event.ctrlKey==true){
+                    if(event.keyCode==123){
+                        event.preventDefault();
+                        search_replace(); }}
+            } // check_key
+        }} // catch_key
+
+
+    function search_replace(){
+        let editor_iframe;
+        let iframe_doc;
+        let iframe_html;
+        let iframe_body;
+        let selection;
+        let range;
+        let ac_node;
+        let insert_node;
+
+        editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+        iframe_doc=editor_iframe.contentWindow.document;
+        iframe_html=iframe_doc.querySelector('html');
+        iframe_body=iframe_doc.querySelector('body.cke_editable');
+        selection=iframe_doc.getSelection();
+        range=selection.getRangeAt(0);
+        ac_node=selection.anchorNode;
+
+            let css='#serch_box { position: fixed; top: 12px; left: calc(50% - 490px); background: #fff; '+
+                'border: 1px solid #aaa; border-radius: 4px; padding: 6px 4px; width: 970px; z-index: 10;}'+
+                '#serch_box input { font-size: 16px; padding: 2px 6px 0;} #serch_box label { width: 2.1em; '+
+                'display: inline-block; line-height: 14px; vertical-align: -6px; padding: 0 4px 0 12px;}'+
+                '#result{ display: inline-block; min-width: 12px; padding: 4px 4px 2px; margin-left: 4px;'+
+                'border: 1px solid #aaa; font-size: 16px;}'+
+                '.s_radio { font-size: 15px; line-height: 16px; padding-left: 10px;}'+
+                '.s_radio input{ vertical-align: -2px; margin-left: 12px;}';
+
+            let i_body=document.querySelector('body.l-body');
+            let style_tag=document.createElement("style");
+            style_tag.type = "text/css";
+            style_tag.setAttribute("class", "ep");
+            style_tag.appendChild(document.createTextNode(css));
+            if(i_body.querySelector('.ep')){
+                i_body.querySelector('.ep').remove(); }
+            i_body.appendChild(style_tag);
+
+            let insert_node_d;
+            insert_node_d=document.createElement('div');
+            insert_node_d.setAttribute('id', 'serch_box');
+            document.querySelector('body.l-body').appendChild(insert_node_d);
+            insert_node_d.innerHTML=
+                '<label for="textInput">検索文字</label><input id="search_word" size="20">'+
+                '<span id="result"></span>'+
+                '<span class="s_radio"><input name="r_select" type="radio">置換</span>'+
+                '<label for="textInput">置換文字</label><input id="replace_word" size="20">'+
+                '<span class="s_radio"><input name="t_select" type="radio">一括処理'+
+                '<input name="t_select" type="radio">順次</span>'+
+                '<span class="s_radio"><input name="u_select" type="radio">HTMLを処理</span>';
+
+
+
+            let search_word=window.prompt('検索する文字列を入力', ''); // 検索語入力ダイアログを表示
+            if(search_word){
+                let editable=iframe_doc.querySelector('.cke_editable');
+                let result=editable.innerHTML.match(new RegExp(search_word, 'g'));
+
+/*
+                for(let k=0; k<result.length; k++){
+                    result[k]
+                     alert(); }
+*/
+
+
+
+
+                setTimeout( function(){
+                let replace_word=window.prompt('置換える文字列を入力', search_word); // 検索語入力ダイアログを表示
+                if(replace_word || replace_word=='' ){
+                    let conf_str='🔴 以下の文字列の一括置換えを実行します\n'+
+                        '　　' + search_word + ' ➜ ' + replace_word;
+                    let ok=confirm(conf_str);
+                    if(ok){
+                        let editable=iframe_doc.querySelector('.cke_editable');
+                        editable.innerHTML=editable.innerHTML.replace(new RegExp(search_word, 'g'), replace_word); }}
+                }, 1000); }
+    } // search_replace()
+})
