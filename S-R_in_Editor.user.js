@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        S-R in Editor ⭐
 // @namespace        http://tampermonkey.net/
-// @version        3.6
+// @version        3.7
 // @description        通常編集枠で実行できる 検索 / 置換 ツール
 // @author        Ameba Blog User
 // @match        https://blog.ameba.jp/ucs/entry/srventry*
@@ -87,7 +87,7 @@ function main(){
 
         if(editor_iframe){ //「通常表示」の場合
             if(search_box){
-                add_mu_style(); // muタグ用 styleをiframeに再設定
+                add_mu_style(); // muタグ用 styleを再設定
                 search_box.disabled=false; }
 
             document.addEventListener("keydown", check_key); // documentは先に指定
@@ -138,7 +138,7 @@ function main(){
             reset_mu_style();
             if(t_flag>0){ //「buffer」を戻したので再度ハイライト表示
                 t_flag=1;
-                t_process(); //🔳RegExp
+                t_process(); //⬛RegExp
                 next(hk); } // UNDO時の巡回表示
             replace_box.focus();
             p_flag=2; } // 2=置換入力
@@ -231,10 +231,29 @@ function main(){
             document.body.insertAdjacentHTML('beforeend', insert_style); }
 
         add_mu_style(); // muタグを設定
+        toc_avoid(1);
 
         monitor.observe(cke_1_contents, {childList: true});
 
     } // disp_s_container() 「開始処理」
+
+
+
+    function toc_avoid(n){
+        let nav=iframe_body.querySelector('nav[aria-labelledby*="toc-"]');
+        if(nav){
+            if(n==1){
+                toc_style(1);
+                nav.removeAttribute('data-toc'); }
+            else{
+                nav.scrollIntoView();
+                iframe_html.scrollBy(0, -12);
+                setTimeout(()=>{
+                    toc_style(0);
+                    nav=iframe_body.querySelector('nav[aria-labelledby*="toc-"]');
+                    nav.setAttribute('data-toc', '1.0.0');
+                }, 800); }}}
+
 
 
     function s_container_remove(n){
@@ -246,8 +265,9 @@ function main(){
             safe_cover(); }
         s_container.remove();
         panel=0;
-        title_sw_remove(); // 🟩
+        title_sw_remove();
         safe_cover_off();
+        toc_avoid(0);
         monitor.observe(cke_1_contents, {childList: true});
 
         function safe_cover(){
@@ -322,9 +342,9 @@ function main(){
 
             if(sr_data[0]==1){ // 連続処理の場合
                 search_word=sr_data[2];
-                search_box.value=sr_data[2]; // 🟥 検索文字取得
+                search_box.value=sr_data[2]; // 🟥検索文字取得
 
-                get_search(); //🔳RegExp
+                get_search(); //⬛RegExp
                 result_box_disp();
 
                 if(count_t==0){
@@ -336,7 +356,7 @@ function main(){
                         replace_process(); }, 20);
 
                     setTimeout(()=>{
-                        replace_word=sr_data[3]; // 🟥 置換文字取得
+                        replace_word=sr_data[3]; // 🟥置換文字取得
                         replace_box.style.display='inline-block';
                         replace_box.value=sr_data[3];
 
@@ -366,11 +386,11 @@ function main(){
 
                         p_flag=3;
                         if(sr_data[1]==1){ // 一括置換
-                            t2_process(); } //🔳RegExp
+                            t2_process(); } //⬛RegExp
                         else if(sr_data[1]==2){ // 選択置換
                             iframe_body.innerHTML=buffer; // 置換処理を一旦デフォルトに戻す ⏹
                             get_search();
-                            t_process(); } //🔳RegExp
+                            t_process(); } //⬛RegExp
                         native_hk=-1;
                         hk=0;
                         next(hk); }, 30);
@@ -403,12 +423,12 @@ function main(){
 
             p_flag=0; // 0=検索文字 未確定
             search_box.focus();
-            search_box.onkeydown=function(event){ // 🔽 検索ツール操作の開始点
+            search_box.onkeydown=function(event){ // 🔽検索ツール操作の開始点
 
                 if(event.keyCode==13 && !event.ctrlKey){ //「Enter」でnot「+Ctrl」
                     if(p_flag==0){
                         event.preventDefault();
-                        search_word=search_box.value; // 🟥 検索文字取得
+                        search_word=search_box.value; // 🟥検索文字取得
                         native_hk=-1; // 初期化🅿
                         get_search();
                         result_box_disp(); }
@@ -426,7 +446,7 @@ function main(){
                                 replace_process(); }} // 巡回ループを抜けて 置換入力へ
                         else{
                             iframe_body.innerHTML=buffer; // highlight を抜ける時はリセット ⏹
-                            search_word=search_box.value; // 🟥 検索文字取得 変更
+                            search_word=search_box.value; // 🟥検索文字取得 変更
                             native_hk=-1; // 初期化🅿
                             result_box.textContent='⏎';
                             caution_reset();
@@ -496,7 +516,7 @@ function main(){
                     s_1.textContent='TEXT処理';
                     t_flag=1; // TEXT処理
                     p_flag=1; // 1=検索文字確定 処理開始
-                    t_process(); //🔳RegExp
+                    t_process(); //⬛RegExp
                     next(hk); }
 
                 if(count_t!=0 && count_h!=0){
@@ -592,14 +612,14 @@ function main(){
             function replace_process(){ // 置換処理全般
                 replace_box.focus();
 
-                replace_box.onkeydown=function(event){ // 🔽 置換操作の開始点
+                replace_box.onkeydown=function(event){ // 🔽置換操作の開始点
                     if(event.keyCode==13 && event.ctrlKey==false){
                         event.preventDefault();
-                        replace_word=replace_box.value; // 🟥 置換文字取得
+                        replace_word=replace_box.value; // 🟥置換文字取得
                         if(t_flag>0){
-                            t2_process(); } //🔳RegExp
+                            t2_process(); } //⬛RegExp
                         else{
-                            h_process(); } //🔳RegExp
+                            h_process(); } //⬛RegExp
                         js_cover.style.display='block';
                         cke_1_contents.style.zIndex='11';
                         iframe_body.contentEditable='false'; // 編集不可にする
@@ -659,7 +679,7 @@ function main(){
                     reset_mu_style();
                     if(t_flag>0){
                         t_flag=1;
-                        t_process(); //🔳RegExp
+                        t_process(); //⬛RegExp
                         next(hk); } // UNDO時は「一括置換」の「巡回表示」
                     replace_box.focus();
                     p_flag=2; } // 2=検索文字確定 置換文字入力 処理選択
@@ -748,13 +768,13 @@ function main(){
 
 
                 function all_replace(){ //「一括置換処理」
-                    t2_process(); //🔳RegExp
+                    t2_process(); //⬛RegExp
                     next(hk); }
 
                 function select_replace(){ //「選択置換処理」
                     iframe_body.innerHTML=buffer; // 置換処理を一旦デフォルトに戻す ⏹
                     get_search();
-                    t_process(); //🔳RegExp
+                    t_process(); //⬛RegExp
                     next(hk); }
 
 
@@ -928,7 +948,7 @@ function main(){
 
 
     function get_search(){
-        search_word_es=escapeRegExp(search_word); //🔳RegExp
+        search_word_es=escapeRegExp(search_word); //⬛RegExp
         editor_iframe=document.querySelector('.cke_wysiwyg_frame'); // ここで取得
 
         if(editor_iframe){ //「通常表示」が実行条件
@@ -961,19 +981,19 @@ function main(){
             count_t=0; // テキストノードのヒット数
             for(let i=0; i<n; i++){ //配列の奇数インデックスはタグ括弧外（TEXT）
                 if(buffer_arr[i*2+1]){
-                    result_t=buffer_arr[i*2+1].match(new RegExp(search_word_es, 'g')); //🔳RegExp
+                    result_t=buffer_arr[i*2+1].match(new RegExp(search_word_es, 'g')); //⬛RegExp
                     if(result_t){
                         count_t+=result_t.length; }}}
             count_h=0; // HTMLコードのヒット数
             for(let i=0; i<n; i++){ //配列の偶数インデックスはタグ括弧内（HTMLコード）
-                result_h=buffer_arr[i*2].match(new RegExp(search_word_es, 'g')); //🔳RegExp
+                result_h=buffer_arr[i*2].match(new RegExp(search_word_es, 'g')); //⬛RegExp
                 if(result_h){
                     count_h+=result_h.length; }}
 
             caution_ck(); //「no-break space」「文字実体参照」の可能性をチェック
         }
 
-        title_test(); // 🟩
+        title_test();
 
     } // get_search()
 
@@ -1030,7 +1050,7 @@ function main(){
                     break; }}
             if(pass!=0 && buffer_arr[i*2+1]){
                 buffer_arr[i*2+1]=
-                    buffer_arr[i*2+1].replace(new RegExp(search_word_es, 'g'), rep_word); }} //🔳RegExp
+                    buffer_arr[i*2+1].replace(new RegExp(search_word_es, 'g'), rep_word); }} //⬛RegExp
         iframe_body.innerHTML=buffer_arr.join(''); }
 
 
@@ -1040,7 +1060,7 @@ function main(){
         for(let i=0; i<n; i++){ //配列の偶数インデックスはタグ括弧内（HTMLコード）
             if(buffer_arr[i*2]){
                 buffer_arr[i*2]=
-                    buffer_arr[i*2].replace(new RegExp(search_word_es, 'g'), rep_word); }} //🔳RegExp
+                    buffer_arr[i*2].replace(new RegExp(search_word_es, 'g'), rep_word); }} //⬛RegExp
         iframe_body.innerHTML=buffer_arr.join(''); }
 
 
@@ -1049,17 +1069,16 @@ function main(){
         editor_iframe=document.querySelector('.cke_wysiwyg_frame');
         if(editor_iframe){ //「通常表示」の場合
             iframe_doc=editor_iframe.contentWindow.document;
-            iframe_html=iframe_doc.querySelector('html');
-            let css_iframe=
+            iframe_html=iframe_doc.documentElement;
+
+            let style_mu=
+                '<style class="ep">'+
                 '.cke_editable mu { background: #ffcc00; } '+ // ハイライト muタグ背景色⭕
-                '.cke_editable mu.h { background: #85ff00; }'; // フォーカス muタグ背景色⭕
-            let style_tag_iframe=iframe_doc.createElement("style");
-            style_tag_iframe.type="text/css";
-            style_tag_iframe.setAttribute("class", "ep");
-            style_tag_iframe.appendChild(document.createTextNode(css_iframe));
+                '.cke_editable mu.h { background: #85ff00; }'+ // フォーカス muタグ背景色⭕
+                '</style>';
             if(iframe_html.querySelector('.ep')){
                 iframe_html.querySelector('.ep').remove(); }
-            iframe_html.appendChild(style_tag_iframe); }}
+            iframe_html.insertAdjacentHTML('beforeend', style_mu); }}
 
 
     function add2_mu_style(){
@@ -1097,7 +1116,29 @@ function main(){
                 let mark=iframe_body.querySelectorAll('mu');
                 if(mark.length!=0){
                     iframe_body.innerHTML=
-                        iframe_body.innerHTML.replace(new RegExp('<mu.*?>', 'g'), ''); }}}} //🔳RegExp
+                        iframe_body.innerHTML.replace(new RegExp('<mu.*?>', 'g'), ''); }}}} //⬛RegExp
+
+
+    function toc_style(n){
+        editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+        if(editor_iframe){ //「通常表示」の場合
+            iframe_doc=editor_iframe.contentWindow.document;
+            iframe_html=iframe_doc.documentElement;
+
+            let style_toc=
+                '<style class="toc">'+ // 検索処理中の「目次」のデザイン
+                'nav[aria-labelledby*="toc-"] { '+
+                'font-size: 14px; padding: 2px 6px; background: #eceff1; }'+
+                'nav .toc-header h2 { font-size: 1em; font-weight: normal; }'+
+                'nav .h2 a { color: #333; text-decoration: none; }'+
+                '</style>';
+            if(n==1){
+                if(!iframe_html.querySelector('.toc')){
+                    iframe_html.insertAdjacentHTML('beforeend', style_toc); }}
+            else{
+                if(iframe_html.querySelector('.toc')){
+                    iframe_html.querySelector('.toc').remove(); }}}}
+
 
 
     function escapeRegExp(string){
@@ -1109,7 +1150,7 @@ function main(){
 
 
 
-    function title_test(){ // 🟩
+    function title_test(){
         let s_container=document.querySelector('#s_container');
         if(s_container){
             if(title_search()){
@@ -1153,8 +1194,8 @@ function main(){
         let tilte_input=document.querySelector('.p-title__text');
         if(tilte_input){
             title_text=tilte_input.value;
-            search_word_es=escapeRegExp(search_word); //🔳RegExp
-            let result_title=title_text.match(new RegExp(search_word_es, 'g')); //🔳RegExp
+            search_word_es=escapeRegExp(search_word); //⬛RegExp
+            let result_title=title_text.match(new RegExp(search_word_es, 'g')); //⬛RegExp
             if(result_title){
                 return true; }
             else{
