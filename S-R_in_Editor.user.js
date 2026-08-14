@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        S-R in Editor ⭐
 // @namespace        http://tampermonkey.net/
-// @version        3.7
+// @version        3.8
 // @description        通常編集枠で実行できる 検索 / 置換 ツール
 // @author        Ameba Blog User
 // @match        https://blog.ameba.jp/ucs/entry/srventry*
@@ -88,6 +88,7 @@ function main(){
         if(editor_iframe){ //「通常表示」の場合
             if(search_box){
                 add_mu_style(); // muタグ用 styleを再設定
+                toc_style(1); // 目次の無効化デザインを再設定
                 search_box.disabled=false; }
 
             document.addEventListener("keydown", check_key); // documentは先に指定
@@ -125,7 +126,6 @@ function main(){
                     if(p_flag==3){ // 置換チェック時に「Tab/Shift/Ctrl/Alt/Pause/Space」を無効化
                         event.preventDefault(); }}}
         } //「通常表示」の場合
-
         else{
             if_html(); } //「HTML表示」の場合
 
@@ -138,7 +138,7 @@ function main(){
             reset_mu_style();
             if(t_flag>0){ //「buffer」を戻したので再度ハイライト表示
                 t_flag=1;
-                t_process(); //⬛RegExp
+                t_process(); // ⬛RegExp
                 next(hk); } // UNDO時の巡回表示
             replace_box.focus();
             p_flag=2; } // 2=置換入力
@@ -195,32 +195,34 @@ function main(){
         let insert_style=
             '<style id="s_r_style">'+
             '#s_container { position: absolute; top: 12px; left: calc(50% - 490px); '+
-            'min-width: 928px; padding: 6px 35px 6px 15px; background: #fff; '+
-            'border: 1px solid #aaa; border-radius: 4px; z-index: 11; }'+
+            'min-width: 925px; padding: 6px 38px 6px 15px; background: #fff; '+
+            'border: 1px solid #aaa; border-radius: 4px; white-space: nowrap; z-index: 11; }'+
             '#search_box { width: 210px; }'+
             '#s_container * { user-select: none; }'+
             '#replace_box { width: 210px; display: none; }'+
             '::placeholder { font-size: 15px; color: #bbb; }'+
             '#s_container input:disabled { color: #000; background: #eef1f3; }'+
-            '#s_container input { font-size: 16px; padding: 2px 6px 0; -moz-appearance: none; }'+
-            '#result { display: inline-block; min-width: 50px; padding: 4px 6px 2px; '+
-            'margin-left: 5px; border: 1px solid #aaa; font-size: 16px; }'+
-            '.s_sw { display: inline-block; vertical-align: -9px; font-size: 15px; '+
-            'padding: 5px 8px 2px; border: 1px solid #aaa; overflow: hidden; }'+
+            '#s_container input { font-size: 16px; padding: 3px 6px 1px; -moz-appearance: none; '+
+            'border: 1px solid #888; border-radius: 3px; }'+
+            '#result { display: inline-block; font-size: 16px; padding: 4px 6px 2px; height: 22px; '+
+            'margin-left: 5px; min-width: 50px; border: 1px solid #888; border-radius: 3px; }'+
+            '.s_sw { display: inline-block; font-size: 15px; padding: 5px 6px 2px; '+
+            'border: 1px solid #888; border-radius: 3px; }'+
             '.s_1 { margin: 0 15px; min-width: 4em; display: none; }'+
             '.s_1 span { color: #fff; }'+
             '.s_2, .s_3, .s_4 { color:#fff; background: #1e88e5; cursor: pointer; display: none; }'+
             '.s_3, .s_5 { margin-left: 5px; }'+
             '.s_2, .s_4 {margin-left: 15px; }'+
             '.s_5 { position: fixed; top: 70px; right: calc(50% - 490px); width: 175px; '+
-            'padding: 10px 10px 8px 20px; border-radius: 4px; background: #e3f2fd; display: none; }'+
+            'padding: 10px 10px 8px 20px; border-radius: 4px; background: #e3f2fd; '+
+            'white-space: initial; display: none; }'+
             '.s_5 c { display: inline-block; height: 21px; margin: 5px 3px; padding: 0 3px; '+
             'outline: 1px solid #aaa; line-height: 24px; background: #fff; }'+
             '.s_6 { margin-left: -1px; background: #ffcc00; display: none; white-space: nowrap; }'+
             '.s_6:hover { width: auto !important; padding: 5px 8px 2px !important; }'+
             '.c_nb, .c_lt, .c_gt, .c_am { font-weight: bold; }'+
             '.s_7 { position: absolute; right: 38px; }'+
-            '.s_8 { margin-left: 20px; color: #fff; background: #ddd; cursor: pointer; display: none; }'+
+            '.s_8 { margin-left: 15px; color: #fff; background: #ddd; cursor: pointer; display: none; }'+
             '.s_9 { position: absolute; top: 11px; right: 8px; padding: 3px 5px 0; line-height: 16px; '+
             'font-weight: bold; color: #fff; border-radius: 30px; background: #aaa; cursor: pointer; }'+
             '.js_cover { position: fixed; top: 0; width: 100%; height: 100%; '+
@@ -256,30 +258,16 @@ function main(){
 
 
 
-    function s_container_remove(n){
+    function s_container_remove(){
         let s_container=document.querySelector('#s_container');
         monitor.disconnect(); // MutationObserverを 起動表示に反応させない
         delete_mu();
         native_hk=-1; // 初期化🅿
-        if(n==1){ //「閉じる」上のポインタで プレビューを機能させない
-            safe_cover(); }
         s_container.remove();
         panel=0;
         title_sw_remove();
-        safe_cover_off();
         toc_avoid(0);
         monitor.observe(cke_1_contents, {childList: true});
-
-        function safe_cover(){
-            let p_title=document.querySelector('.p-title');
-            if(p_title){
-                p_title.style.zIndex='11'; }}
-
-        function safe_cover_off(){
-            let p_title=document.querySelector('.p-title');
-            if(p_title){
-                p_title.onmouseout=function(){
-                    p_title.style.zIndex='0'; }}}
 
     } // s_container_remove() 「終了処理」
 
@@ -311,19 +299,19 @@ function main(){
 
     function search_replace(){
         editor_iframe=document.querySelector('.cke_wysiwyg_frame');
-
         if(editor_iframe){ //「通常表示」の場合
             iframe_doc=editor_iframe.contentWindow.document;
             iframe_html=iframe_doc.querySelector('html');
             iframe_body=iframe_doc.querySelector('body.cke_editable'); }
 
+
         disp_js_cover();
 
         let s_container=document.querySelector('#s_container');
         if(s_container){ // #s_container がある場合は「Ctrl+F12」で終了  「muタグを削除」
-            s_container_remove(0); }
+            s_container_remove(); }
 
-        else if(!s_container){ //#s_containerが無い場合 生成して開始
+        else{ //#s_containerが無い場合 生成して開始
             disp_s_container();
             panel=1;
 
@@ -344,7 +332,7 @@ function main(){
                 search_word=sr_data[2];
                 search_box.value=sr_data[2]; // 🟥検索文字取得
 
-                get_search(); //⬛RegExp
+                get_search(); // ⬛RegExp
                 result_box_disp();
 
                 if(count_t==0){
@@ -386,19 +374,20 @@ function main(){
 
                         p_flag=3;
                         if(sr_data[1]==1){ // 一括置換
-                            t2_process(); } //⬛RegExp
+                            t2_process(); } // ⬛RegExp
                         else if(sr_data[1]==2){ // 選択置換
                             iframe_body.innerHTML=buffer; // 置換処理を一旦デフォルトに戻す ⏹
                             get_search();
-                            t_process(); } //⬛RegExp
+                            t_process(); } // ⬛RegExp
                         native_hk=-1;
                         hk=0;
                         next(hk); }, 30);
 
+
                     function disp_help(){
                         if(t_flag==1){
                             s_5.innerHTML=
-                                '<c>⇦</c><c>⇧</c><c>⇩</c><c>⇨</c>：移動<br>'+
+                                '<c>⇧</c><c>⇩</c>：移動<br>'+
                                 '┈┈┈┈┈┈┈┈┈┈┈<br>'+
                                 '検索した全箇所が置換えられる事に注意ください<br>'+
                                 '┈┈┈┈┈┈┈┈┈┈┈<br>'+
@@ -408,7 +397,7 @@ function main(){
                                 '　　 ：全て元に戻す'; }
                         else if(t_flag==2){
                             s_5.innerHTML=
-                                '<c>⇦</c><c>⇧</c><c>⇩</c><c>⇨</c>：移動<br>'+
+                                '<c>⇧</c><c>⇩</c>：移動<br>'+
                                 '<c>Space</c>：設定 / 解除<br>'+
                                 '┈┈┈┈┈┈┈┈┈┈┈<br>'+
                                 '設定した箇所のみに置換を実行します<br>'+
@@ -417,6 +406,7 @@ function main(){
                                 '　　 ：置換を確定する<br>'+
                                 '<c>UNDO</c> / <c>Esc</c><br>'+
                                 '　　 ：全て元に戻す'; }}
+
 
                 }} // 連続処理の場合
 
@@ -448,7 +438,6 @@ function main(){
                             iframe_body.innerHTML=buffer; // highlight を抜ける時はリセット ⏹
                             search_word=search_box.value; // 🟥検索文字取得 変更
                             native_hk=-1; // 初期化🅿
-                            result_box.textContent='⏎';
                             caution_reset();
                             s_1.style.display='none';
                             arg_t_or_h=0;
@@ -458,7 +447,7 @@ function main(){
 
                 if(event.keyCode==13 && event.ctrlKey){ //「Enter+Ctrl」
                     if(search_box.value==''){
-                        s_container_remove(1); }} // ツールの終了
+                        s_container_remove(); }} // ツールの終了
 
                 if(event.keyCode==9){ //「Tab」で置換入力へ
                     if(p_flag==0){
@@ -496,8 +485,8 @@ function main(){
                         search_box.value=search_word; }, 500); }}
 
 
-            s_7.onclick=function(){
-                s_container_remove(1); } // s_7.onclick 「✖ 閉じる」で終了
+            s_7.onmouseup=function(){ //「✖ 閉じる」で終了（直下のプレビューを押さない）
+                s_container_remove(); }
 
 
             function result_box_disp(){
@@ -513,10 +502,10 @@ function main(){
                 replace_box.value='';
 
                 if(count_t!=0 && count_h==0){
-                    s_1.textContent='TEXT処理';
+                    s_1.textContent='Text処理';
                     t_flag=1; // TEXT処理
                     p_flag=1; // 1=検索文字確定 処理開始
-                    t_process(); //⬛RegExp
+                    t_process(); // ⬛RegExp
                     next(hk); }
 
                 if(count_t!=0 && count_h!=0){
@@ -526,7 +515,7 @@ function main(){
 
                 if(count_t==0 && count_h!=0){
                     result_box.textContent='H:'+count_h;
-                    s_1.textContent='HTML処理';
+                    s_1.textContent='Html処理';
                     s_1.style.color='#000';
                     t_flag=0;
                     p_flag=1; // 1=検索文字確定 処理開始
@@ -542,15 +531,15 @@ function main(){
                     if(t_or_h==1){
                         t_flag=1; // TEXT処理
                         result_box.textContent='T:'+count_t+'│-';
-                        s_1.innerHTML='TEXT処理　<span>HTML</span>';
-                        s_1.style.boxShadow='inset -56px 0 0 0 #cfd8dc';
+                        s_1.innerHTML='Text処理　<span>H</span>';
+                        s_1.style.boxShadow='inset -25px 0 0 0 #cfd8dc';
                         t_process();
                         next(hk); }
                     else{
                         t_flag=0; // HTML処理
                         result_box.textContent='H:'+count_h;
-                        s_1.innerHTML='<span>TEXT</span>　HTML処理';
-                        s_1.style.boxShadow='inset 54px 0 0 0 #cfd8dc';
+                        s_1.innerHTML='<span>T</span>　Html処理';
+                        s_1.style.boxShadow='inset 24px 0 0 0 #cfd8dc';
                         replace_process(); }
 
                     s_1.onclick=function(){
@@ -561,26 +550,26 @@ function main(){
                         if(t_or_h==1){
                             t_or_h=0; // HTML処理を選択
                             t_flag=0;
-                            s_1.innerHTML='<span>TEXT</span>　HTML処理';
-                            s_1.style.boxShadow='inset 54px 0 0 0 #cfd8dc';
+                            s_1.innerHTML='<span>T</span>　Html処理';
+                            s_1.style.boxShadow='inset 24px 0 0 0 #cfd8dc';
                             result_box.textContent='H:'+count_h;
                             replace_process(); }
                         else{
                             t_or_h=1; // TEXT処理を選択
                             t_flag=1;
-                            s_1.innerHTML='TEXT処理　<span>HTML</span>';
-                            s_1.style.boxShadow='inset -56px 0 0 0 #cfd8dc';
+                            s_1.innerHTML='Text処理　<span>H</span>';
+                            s_1.style.boxShadow='inset -25px 0 0 0 #cfd8dc';
                             result_box.textContent='T:'+count_t+'│-';
                             t_process();
                             next(hk); }}}
 
                 search_box.onblur=function(){ //「検索枠」が focusを無くしたらリセット
-                    setTimeout( ()=>{
+                    setTimeout(()=>{
                         if(replace_box.style.display=='none'){ //「置換」へ移動とT/H操作は除外
                             stop_out(); }}, 10); }
 
                 replace_box.onblur=function(){ //「置換枠」が focusを無くしたらリセット
-                    setTimeout( ()=>{
+                    setTimeout(()=>{
                         if(p_flag!=3){ //「置換チェック画面」へ移行は除外
                             stop_out(); }}, 10); }
 
@@ -617,9 +606,9 @@ function main(){
                         event.preventDefault();
                         replace_word=replace_box.value; // 🟥置換文字取得
                         if(t_flag>0){
-                            t2_process(); } //⬛RegExp
+                            t2_process(); } // ⬛RegExp
                         else{
-                            h_process(); } //⬛RegExp
+                            h_process(); } // ⬛RegExp
                         js_cover.style.display='block';
                         cke_1_contents.style.zIndex='11';
                         iframe_body.contentEditable='false'; // 編集不可にする
@@ -679,7 +668,7 @@ function main(){
                     reset_mu_style();
                     if(t_flag>0){
                         t_flag=1;
-                        t_process(); //⬛RegExp
+                        t_process(); // ⬛RegExp
                         next(hk); } // UNDO時は「一括置換」の「巡回表示」
                     replace_box.focus();
                     p_flag=2; } // 2=検索文字確定 置換文字入力 処理選択
@@ -739,14 +728,11 @@ function main(){
                 s_9.addEventListener('mouseleave', ()=>{
                     disp_help(); }, false);
 
-                s_9.onclick=function(){
-                    window.open("https://ameblo.jp/personwritep/entry-12758975310.html", '_blank'); }
-
 
                 function disp_help(){
                     if(t_flag==1){
                         s_5.innerHTML=
-                            '<c>⇦</c><c>⇧</c><c>⇩</c><c>⇨</c>：移動<br>'+
+                            '<c>⇧</c><c>⇩</c>：移動<br>'+
                             '┈┈┈┈┈┈┈┈┈┈┈<br>'+
                             '検索した全箇所が置換えられる事に注意ください<br>'+
                             '┈┈┈┈┈┈┈┈┈┈┈<br>'+
@@ -756,7 +742,7 @@ function main(){
                             '　　 ：全て元に戻す'; }
                     else if(t_flag==2){
                         s_5.innerHTML=
-                            '<c>⇦</c><c>⇧</c><c>⇩</c><c>⇨</c>：移動<br>'+
+                            '<c>⇧</c><c>⇩</c>：移動<br>'+
                             '<c>Space</c>：設定 / 解除<br>'+
                             '┈┈┈┈┈┈┈┈┈┈┈<br>'+
                             '設定した箇所のみに置換を実行します<br>'+
@@ -768,13 +754,13 @@ function main(){
 
 
                 function all_replace(){ //「一括置換処理」
-                    t2_process(); //⬛RegExp
+                    t2_process(); // ⬛RegExp
                     next(hk); }
 
                 function select_replace(){ //「選択置換処理」
                     iframe_body.innerHTML=buffer; // 置換処理を一旦デフォルトに戻す ⏹
                     get_search();
-                    t_process(); //⬛RegExp
+                    t_process(); // ⬛RegExp
                     next(hk); }
 
 
@@ -841,6 +827,12 @@ function main(){
                 } //「C」連続処理モードボタン
 
             } // replace_process()
+
+
+            s_9.onclick=function(){
+                window.open("https://ameblo.jp/personwritep/entry-12758975310.html",
+                            '_blank', 'width=780, height=900'); }
+
         } // #s_container が無い場合「Ctrl+F12」で開始
 
     } // search_replace()
@@ -887,16 +879,8 @@ function main(){
                 if(p_flag>0 && t_flag>0){
                     event.preventDefault();
                     back(); }}
-            if(event.keyCode==37){ //「←」
-                if(p_flag==3 && t_flag>0){
-                    event.preventDefault();
-                    back(); }}
             if(event.keyCode==40){ //「↓」
                 if(p_flag>0 && t_flag>0){
-                    event.preventDefault();
-                    forward() }}
-            if(event.keyCode==39){ //「→」
-                if(p_flag==3 && t_flag>0){
                     event.preventDefault();
                     forward() }}
             if(event.keyCode==32){ //「Space」で個別に置換の設定/解除
@@ -948,7 +932,7 @@ function main(){
 
 
     function get_search(){
-        search_word_es=escapeRegExp(search_word); //⬛RegExp
+        search_word_es=escapeRegExp(search_word); // ⬛RegExp
         editor_iframe=document.querySelector('.cke_wysiwyg_frame'); // ここで取得
 
         if(editor_iframe){ //「通常表示」が実行条件
@@ -980,13 +964,14 @@ function main(){
 
             count_t=0; // テキストノードのヒット数
             for(let i=0; i<n; i++){ //配列の奇数インデックスはタグ括弧外（TEXT）
-                if(buffer_arr[i*2+1]){
-                    result_t=buffer_arr[i*2+1].match(new RegExp(search_word_es, 'g')); //⬛RegExp
+                if(!buffer_arr[i*2].match(new RegExp('<style')) && buffer_arr[i*2+1]){ // styleタグは除外
+                    result_t=buffer_arr[i*2+1].match(new RegExp(search_word_es, 'g')); // ⬛RegExp
                     if(result_t){
                         count_t+=result_t.length; }}}
+
             count_h=0; // HTMLコードのヒット数
             for(let i=0; i<n; i++){ //配列の偶数インデックスはタグ括弧内（HTMLコード）
-                result_h=buffer_arr[i*2].match(new RegExp(search_word_es, 'g')); //⬛RegExp
+                result_h=buffer_arr[i*2].match(new RegExp(search_word_es, 'g')); // ⬛RegExp
                 if(result_h){
                     count_h+=result_h.length; }}
 
@@ -1050,7 +1035,7 @@ function main(){
                     break; }}
             if(pass!=0 && buffer_arr[i*2+1]){
                 buffer_arr[i*2+1]=
-                    buffer_arr[i*2+1].replace(new RegExp(search_word_es, 'g'), rep_word); }} //⬛RegExp
+                    buffer_arr[i*2+1].replace(new RegExp(search_word_es, 'g'), rep_word); }} // ⬛RegExp
         iframe_body.innerHTML=buffer_arr.join(''); }
 
 
@@ -1060,7 +1045,7 @@ function main(){
         for(let i=0; i<n; i++){ //配列の偶数インデックスはタグ括弧内（HTMLコード）
             if(buffer_arr[i*2]){
                 buffer_arr[i*2]=
-                    buffer_arr[i*2].replace(new RegExp(search_word_es, 'g'), rep_word); }} //⬛RegExp
+                    buffer_arr[i*2].replace(new RegExp(search_word_es, 'g'), rep_word); }} // ⬛RegExp
         iframe_body.innerHTML=buffer_arr.join(''); }
 
 
@@ -1116,7 +1101,7 @@ function main(){
                 let mark=iframe_body.querySelectorAll('mu');
                 if(mark.length!=0){
                     iframe_body.innerHTML=
-                        iframe_body.innerHTML.replace(new RegExp('<mu.*?>', 'g'), ''); }}}} //⬛RegExp
+                        iframe_body.innerHTML.replace(new RegExp('<mu.*?>', 'g'), ''); }}}} // ⬛RegExp
 
 
     function toc_style(n){
@@ -1194,8 +1179,8 @@ function main(){
         let tilte_input=document.querySelector('.p-title__text');
         if(tilte_input){
             title_text=tilte_input.value;
-            search_word_es=escapeRegExp(search_word); //⬛RegExp
-            let result_title=title_text.match(new RegExp(search_word_es, 'g')); //⬛RegExp
+            search_word_es=escapeRegExp(search_word); // ⬛RegExp
+            let result_title=title_text.match(new RegExp(search_word_es, 'g')); // ⬛RegExp
             if(result_title){
                 return true; }
             else{
