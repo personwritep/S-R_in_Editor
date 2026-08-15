@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        S-R in Editor ⭐
 // @namespace        http://tampermonkey.net/
-// @version        3.8
+// @version        3.9
 // @description        通常編集枠で実行できる 検索 / 置換 ツール
 // @author        Ameba Blog User
 // @match        https://blog.ameba.jp/ucs/entry/srventry*
@@ -542,26 +542,29 @@ function main(){
                         s_1.style.boxShadow='inset 24px 0 0 0 #cfd8dc';
                         replace_process(); }
 
-                    s_1.onclick=function(){
-                        search_box.focus();
-                        native_hk=-1; // 初期化🅿
-                        iframe_body.innerHTML=buffer; // highlight を抜ける時はリセット ⏹
-                        get_search();
-                        if(t_or_h==1){
-                            t_or_h=0; // HTML処理を選択
-                            t_flag=0;
-                            s_1.innerHTML='<span>T</span>　Html処理';
-                            s_1.style.boxShadow='inset 24px 0 0 0 #cfd8dc';
-                            result_box.textContent='H:'+count_h;
-                            replace_process(); }
-                        else{
-                            t_or_h=1; // TEXT処理を選択
-                            t_flag=1;
-                            s_1.innerHTML='Text処理　<span>H</span>';
-                            s_1.style.boxShadow='inset -25px 0 0 0 #cfd8dc';
-                            result_box.textContent='T:'+count_t+'│-';
-                            t_process();
-                            next(hk); }}}
+                    s_1.onmousedown=function(event){
+                        if(arg_t_or_h==1){
+                            event.preventDefault();
+                            search_box.focus();
+                            native_hk=-1; // 初期化🅿
+                            iframe_body.innerHTML=buffer; // highlight を抜ける時はリセット ⏹
+                            get_search();
+
+                            if(t_or_h==1){
+                                t_or_h=0; // HTML処理を選択
+                                t_flag=0;
+                                s_1.innerHTML='<span>T</span>　Html処理';
+                                s_1.style.boxShadow='inset 24px 0 0 0 #cfd8dc';
+                                result_box.textContent='H:'+count_h;
+                                replace_process(); }
+                            else{
+                                t_or_h=1; // TEXT処理を選択
+                                t_flag=1;
+                                s_1.innerHTML='Text処理　<span>H</span>';
+                                s_1.style.boxShadow='inset -25px 0 0 0 #cfd8dc';
+                                result_box.textContent='T:'+count_t+'│-';
+                                t_process();
+                                next(hk); }}}}
 
                 search_box.onblur=function(){ //「検索枠」が focusを無くしたらリセット
                     setTimeout(()=>{
@@ -575,10 +578,9 @@ function main(){
 
                 function stop_out(){
                     if(arg_t_or_h==1){
-                        setTimeout(()=>{
-                            if(search_box!=document.activeElement){
-                                arg_t_or_h=0;
-                                stop_out(); }}, 400); }
+                        if(search_box!=document.activeElement){
+                            arg_t_or_h=0;
+                            stop_out(); }}
                     else{
                         if(p_flag==1 || p_flag==2){ // 1=検索文字入力 2=置換文字入力
                             if(t_flag>0){
@@ -1068,10 +1070,14 @@ function main(){
 
     function add2_mu_style(){
         if(replace_word==''){
-            replace_box.setAttribute('placeholder', "　　　🟦 削除モード");
-            replace_box.style.border='2px solid #009688';
-            replace_box.style.background='#090907';
-            replace_box.style.filter='invert(1)';
+            replace_box.setAttribute('placeholder', "　　　🟥 削除モード");
+            let box_style=
+                '<style class="add2_box_style">'+
+                '#replace_box { outline: 1px solid red; } '+
+                '#replace_box::placeholder { color: #000; } '+
+                '</style>';
+            if(!document.querySelector('.add2_box_style')){
+                document.body.insertAdjacentHTML('beforeend', box_style); }
             if(t_flag>0){
                 if(iframe_html.querySelector('.ep')){ // ハイライト・フォーカス muタグ「削除モード」⭕
                     iframe_html.querySelector('.ep').textContent=
@@ -1082,9 +1088,8 @@ function main(){
 
     function reset_mu_style(){
         replace_box.setAttribute('placeholder', " 置換文字");
-        replace_box.style.border='';
-        replace_box.style.background='';
-        replace_box.style.filter='none';
+        if(document.querySelector('.add2_box_style')){
+            document.querySelector('.add2_box_style').remove(); }
         if(t_flag>0){
             if(iframe_html.querySelector('.ep')){ // ハイライト・フォーカス muタグ デフォルト ⭕
                 iframe_html.querySelector('.ep').textContent=
