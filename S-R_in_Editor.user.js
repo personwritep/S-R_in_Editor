@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        S-R in Editor ⭐
 // @namespace        http://tampermonkey.net/
-// @version        3.9
+// @version        4.0
 // @description        通常編集枠で実行できる 検索 / 置換 ツール
 // @author        Ameba Blog User
 // @match        https://blog.ameba.jp/ucs/entry/srventry*
@@ -88,8 +88,10 @@ function main(){
         if(editor_iframe){ //「通常表示」の場合
             if(search_box){
                 add_mu_style(); // muタグ用 styleを再設定
-                toc_style(1); // 目次の無効化デザインを再設定
+                toc_avoid(1);
                 search_box.disabled=false; }
+            else{
+                toc_avoid(0); } //「HTML表示」でツール終了した場合に目次を戻す
 
             document.addEventListener("keydown", check_key); // documentは先に指定
             iframe_doc=editor_iframe.contentWindow.document;
@@ -112,6 +114,7 @@ function main(){
                             event.stopImmediatePropagation();
                             if(event.altKey){
                                 delete_mu();
+                                toc_attr(0);
                                 publish(); }}}}
                 if(event.keyCode==27){
                     if(p_flag==3){ // 置換チェック時に「Esc」で置換チェックを解除=UNDO
@@ -234,6 +237,7 @@ function main(){
 
         add_mu_style(); // muタグを設定
         toc_avoid(1);
+        before_end();
 
         monitor.observe(cke_1_contents, {childList: true});
 
@@ -241,32 +245,15 @@ function main(){
 
 
 
-    function toc_avoid(n){
-        let nav=iframe_body.querySelector('nav[aria-labelledby*="toc-"]');
-        if(nav){
-            if(n==1){
-                toc_style(1);
-                nav.removeAttribute('data-toc'); }
-            else{
-                nav.scrollIntoView();
-                iframe_html.scrollBy(0, -12);
-                setTimeout(()=>{
-                    toc_style(0);
-                    nav=iframe_body.querySelector('nav[aria-labelledby*="toc-"]');
-                    nav.setAttribute('data-toc', '1.0.0');
-                }, 800); }}}
-
-
-
     function s_container_remove(){
         let s_container=document.querySelector('#s_container');
         monitor.disconnect(); // MutationObserverを 起動表示に反応させない
         delete_mu();
+        toc_avoid(0);
         native_hk=-1; // 初期化🅿
         s_container.remove();
         panel=0;
         title_sw_remove();
-        toc_avoid(0);
         monitor.observe(cke_1_contents, {childList: true});
 
     } // s_container_remove() 「終了処理」
@@ -327,6 +314,7 @@ function main(){
             s_7=document.querySelector('.s_7');
             s_8=document.querySelector('.s_8');
             s_9=document.querySelector('.s_9');
+
 
             if(sr_data[0]==1){ // 連続処理の場合
                 search_word=sr_data[2];
@@ -406,7 +394,6 @@ function main(){
                                 '　　 ：置換を確定する<br>'+
                                 '<c>UNDO</c> / <c>Esc</c><br>'+
                                 '　　 ：全て元に戻す'; }}
-
 
                 }} // 連続処理の場合
 
@@ -767,7 +754,6 @@ function main(){
 
 
                 s_8.onclick=function(event){ //「C」連続処理モードボタン
-
                     if(sr_data[0]==0){ // 連続処理モードOFF
                         let result=window.confirm(
                             "「OK」： 連続処理モードをONにします\n"+
@@ -978,7 +964,8 @@ function main(){
                     count_h+=result_h.length; }}
 
             caution_ck(); //「no-break space」「文字実体参照」の可能性をチェック
-        }
+
+        } // if(editor_iframe)
 
         title_test();
 
@@ -1109,6 +1096,22 @@ function main(){
                         iframe_body.innerHTML.replace(new RegExp('<mu.*?>', 'g'), ''); }}}} // ⬛RegExp
 
 
+
+    function toc_avoid(n){
+        editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+        if(editor_iframe){ //「通常表示」の場合
+            iframe_doc=editor_iframe.contentWindow.document;
+            if(iframe_doc){
+                let nav=iframe_doc.querySelector('nav[aria-labelledby*="toc-"]');
+                if(nav){
+                    if(n==1){
+                        toc_style(1);
+                        toc_attr(1); }
+                    else{
+                        toc_style(0);
+                        toc_attr(0); }}}}}
+
+
     function toc_style(n){
         editor_iframe=document.querySelector('.cke_wysiwyg_frame');
         if(editor_iframe){ //「通常表示」の場合
@@ -1128,6 +1131,15 @@ function main(){
             else{
                 if(iframe_html.querySelector('.toc')){
                     iframe_html.querySelector('.toc').remove(); }}}}
+
+
+    function toc_attr(n){
+        let nav=iframe_doc.querySelector('nav[aria-labelledby*="toc-"]');
+        if(nav){
+            if(n==0){
+                nav.setAttribute('data-toc', '1.0.0'); }
+            else{
+                nav.removeAttribute('data-toc'); }}}
 
 
 
@@ -1155,8 +1167,7 @@ function main(){
                             panel=1;
                             s_container.style.display='block'; }}}}
             else{
-                title_sw_remove(); }
-        }} // title_test()
+                title_sw_remove(); }}}
 
 
     function title_sw(){
@@ -1203,5 +1214,26 @@ function main(){
             let publish0=document.querySelector('.p-submit__container button[publishflg="0"]');
             if(publish0){
                 publish0.click(); }}}
+
+
+
+    function before_end(){
+        editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+        let submitButton=document.querySelectorAll('.js-submitButton');
+        submitButton[0].addEventListener("mousedown", all_clear, false);
+        submitButton[1].addEventListener("mousedown", all_clear, false);
+
+        function all_clear(){
+            if(!editor_iframe){ //「HTML表示」編集画面の場合
+                alert("⛔　S-R in Editor ⭐ の終了処理ができません\n\n"+
+                      "　　 通常表示画面に戻り 編集を終了してください");
+                event.stopImmediatePropagation();
+                event.preventDefault(); }
+            if(editor_iframe){ //「通常表示」編集画面の場合
+                toc_attr(0);
+                setTimeout(()=>{
+                    toc_attr(0); }, 20); }} // 2回リセットが必要
+
+    } // before_end()
 
 } // main()
