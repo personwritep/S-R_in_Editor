@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name        S-R in Editor ⭐
 // @namespace        http://tampermonkey.net/
-// @version        4.0
+// @version        4.1
 // @description        通常編集枠で実行できる 検索 / 置換 ツール
 // @author        Ameba Blog User
-// @match        https://blog.ameba.jp/ucs/entry/srventry*
-// @exclude        https://blog.ameba.jp/ucs/entry/srventrylist.do*
+// @match        https://blog.ameba.jp/ucs/entry/srventryinsertinput.do*
+// @match        https://blog.ameba.jp/ucs/entry/srventryupdateinput.do*
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=ameba.jp
 // @grant        none
 // @updateURL        https://github.com/personwritep/S-R_in_Editor/raw/main/S-R_in_Editor.user.js
