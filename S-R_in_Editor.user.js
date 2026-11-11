@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        S-R in Editor ⭐
 // @namespace        http://tampermonkey.net/
-// @version        4.1
+// @version        4.2
 // @description        通常編集枠で実行できる 検索 / 置換 ツール
 // @author        Ameba Blog User
 // @match        https://blog.ameba.jp/ucs/entry/srventryinsertinput.do*
@@ -12,6 +12,10 @@
 // @downloadURL        https://github.com/personwritep/S-R_in_Editor/raw/main/S-R_in_Editor.user.js
 // ==/UserScript==
 
+
+let listen=Symbol();
+let listenA=Symbol();
+let listenE=Symbol();
 
 let retry=0;
 let interval=setInterval(wait_target, 100);
@@ -85,6 +89,10 @@ function main(){
         search_box=document.querySelector('#search_box');
         editor_iframe=document.querySelector('.cke_wysiwyg_frame');
 
+        if(!document[listen]){
+            document.addEventListener("keydown", check_key); // documentは先に指定
+            document[listen]=true; }
+
         if(editor_iframe){ //「通常表示」の場合
             if(search_box){
                 add_mu_style(); // muタグ用 styleを再設定
@@ -93,44 +101,47 @@ function main(){
             else{
                 toc_avoid(0); } //「HTML表示」でツール終了した場合に目次を戻す
 
-            document.addEventListener("keydown", check_key); // documentは先に指定
             iframe_doc=editor_iframe.contentWindow.document;
             if(iframe_doc){
-                iframe_doc.addEventListener("keydown", check_key); } // iframeは後に指定
+                if(!iframe_doc[listen]){
+                    iframe_doc.addEventListener("keydown", check_key); // iframeは後に指定
+                    iframe_doc[listen]=true; }}
 
-            function check_key(event){
-                if(event.ctrlKey==true){
-                    if(event.keyCode==123){
-                        if(p_flag!=3){ // 置換チェック時でなければ「Ctrl+F12」でON/OFF
-                            event.stopImmediatePropagation();
-                            search_replace();
-                            if(!editor_iframe){
-                                if_html(); }}}
-                    else if(event.keyCode==13){
-                        if(p_flag==3){
-                            event.stopImmediatePropagation();
-                            pusher(); }
-                        else{
-                            event.stopImmediatePropagation();
-                            if(event.altKey){
-                                delete_mu();
-                                toc_attr(0);
-                                publish(); }}}}
-                if(event.keyCode==27){
-                    if(p_flag==3){ // 置換チェック時に「Esc」で置換チェックを解除=UNDO
-                        event.preventDefault();
-                        out_p_flag3(); }}
-                if(event.keyCode==9){
-                    if(p_flag==0){ // 編集時に編集枠から「Tab」で検索に戻る
-                        event.preventDefault();
-                        search_box.focus(); }}
-                if(event.keyCode==9 || event.keyCode==16 || event.keyCode==17 ||
-                   event.keyCode==18 || event.keyCode==19 || event.keyCode==32){
-                    if(p_flag==3){ // 置換チェック時に「Tab/Shift/Ctrl/Alt/Pause/Space」を無効化
-                        event.preventDefault(); }}}
         } //「通常表示」の場合
         else{
             if_html(); } //「HTML表示」の場合
+
+
+        function check_key(event){
+            if(event.ctrlKey==true){
+                if(event.keyCode==123){
+                    if(p_flag!=3){ // 置換チェック時でなければ「Ctrl+F12」でON/OFF
+                        event.stopImmediatePropagation();
+                        search_replace();
+                        if(!editor_iframe){
+                            if_html(); }}}
+                else if(event.keyCode==13){
+                    if(p_flag==3){
+                        event.stopImmediatePropagation();
+                        pusher(); }
+                    else{
+                        event.stopImmediatePropagation();
+                        if(event.altKey){
+                            delete_mu();
+                            toc_attr(0);
+                            publish(); }}}}
+            if(event.keyCode==27){
+                if(p_flag==3){ // 置換チェック時に「Esc」で置換チェックを解除=UNDO
+                    event.preventDefault();
+                    out_p_flag3(); }}
+            if(event.keyCode==9){
+                if(p_flag==0){ // 編集時に編集枠から「Tab」で検索に戻る
+                    event.preventDefault();
+                    search_box.focus(); }}
+            if(event.keyCode==9 || event.keyCode==16 || event.keyCode==17 ||
+               event.keyCode==18 || event.keyCode==19 || event.keyCode==32){
+                if(p_flag==3){ // 置換チェック時に「Tab/Shift/Ctrl/Alt/Pause/Space」を無効化
+                    event.preventDefault(); }}}
 
 
         function out_p_flag3(){ // 置換チェックを解除する
@@ -162,7 +173,6 @@ function main(){
                 s_8.style.display='none';
                 t_flag=0;
                 p_flag=0; }}
-
 
         function pusher(){
             s_2.click(); }
@@ -673,17 +683,19 @@ function main(){
                         all_replace(); }
                     disp_help(); }
 
-                s_4.addEventListener('mouseover', ()=>{
+
+                s_4.onmouseover=()=>{
                     if(t_flag==2){
                         s_5.innerHTML=
                             '｢一括｣ に切換える際に<br>'+
                             '選択した置換の設定は<br>'+
-                            '全てリセットされます'; }}, false);
+                            '全てリセットされます'; }}
 
-                s_4.addEventListener('mouseleave', ()=>{
-                    disp_help(); }, false);
+                s_4.onmouseleave=()=>{
+                    disp_help(); }
 
-                s_8.addEventListener('mouseover', ()=>{
+
+                s_8.onmouseover=()=>{
                     if(sr_data[0]==0){
                         s_5.innerHTML=
                             '<c>C</c>：連続処理モードON<br>'+
@@ -705,17 +717,18 @@ function main(){
                             '› ｢一括 / 選択｣ の選択<br>'+
                             'を登録します<br>'+
                             '次回からこの処理設定が<br>'+
-                            '実行されます'; }}, false);
+                            '実行されます'; }}
 
-                s_8.addEventListener('mouseleave', ()=>{
-                    disp_help(); }, false);
+                s_8.onmouseleave=()=>{
+                    disp_help(); }
 
-                s_9.addEventListener('mouseover', ()=>{
+
+                s_9.onmouseover=()=>{
                     s_5.innerHTML=
-                        '操作マニュアルを表示'; });
+                        '操作マニュアルを表示'; }
 
-                s_9.addEventListener('mouseleave', ()=>{
-                    disp_help(); }, false);
+                s_9.onmouseleave=()=>{
+                    disp_help(); }
 
 
                 function disp_help(){
@@ -830,9 +843,9 @@ function main(){
     function next(hk){ //「巡回表示」「選択置換」コード
         let mark=iframe_body.querySelectorAll('mu');
 
-        if(native_hk!=-1){ // 基本的に前回のインデックスを再現🅿
+        if(native_hk && native_hk!=-1){ // 基本的に前回のインデックスを再現🅿
             hk=native_hk; }
-        else if(native_hk==-1 || !native_hk){ // 初期インデックス生成🅿
+        else{ // 初期インデックス生成🅿
             if(mark.length==1){ hk=0; } // 1個なら即決定
             else{
                 let near_n; // 中央後方の要素のインデックス
@@ -853,16 +866,21 @@ function main(){
         view(hk);
         try{
             mark[hk].classList.add("h"); } // 最初のハイライト色を変更
-        catch(e){ ; }
-
+        catch(e){ ; } // 連続処理でヒットが無い場合に対応
         result_box.textContent='T:'+count_t+'│'+(hk+1);
 
-        document.addEventListener("keydown", check_arrow); // documentは先に指定
-        iframe_doc=editor_iframe.contentWindow.document;
-        if(iframe_doc){
-            iframe_doc.addEventListener("keydown", check_arrow); }// iframeは後に指定
+
+        if(!document[listenA]){
+            document.addEventListener('keydown', check_arrow); // documentは先に指定
+            document[listenA]=true; }
+
 
         function check_arrow(event){
+            let mark=iframe_body.querySelectorAll('mu');
+            for(let k=0; k<mark.length; k++){
+                if(mark[k].classList.contains('h')){
+                    hk=k; }}
+
             if(event.keyCode==38){ //「↑」
                 if(p_flag>0 && t_flag>0){
                     event.preventDefault();
@@ -1206,22 +1224,35 @@ function main(){
 
 
 
-    function publish(){
+    function publish(){ //「Ctrl+Alt+Enter」で「投稿する」を押す
         let editor_iframe=document.querySelector('.cke_wysiwyg_frame');
         if(!editor_iframe){ //「HTML表示」編集画面の場合
             alert("⛔　通常表示画面に戻って投稿してください"); }
         if(editor_iframe){ //「通常表示」編集画面の場合
             let publish0=document.querySelector('.p-submit__container button[publishflg="0"]');
             if(publish0){
-                publish0.click(); }}}
+                let mevent=new MouseEvent('mousedown', {
+                    bubbles: true,
+                    cancelable: true, });
+                publish0.dispatchEvent(mevent); // SP Coutionの離脱防止をキャンセル
+                publish0.click();
+
+                setTimeout(() => {
+                    window.close(); // 投稿後の「記事の編集」のタブは閉じる
+                }, 500);
+            }}}
 
 
 
     function before_end(){
         editor_iframe=document.querySelector('.cke_wysiwyg_frame');
         let submitButton=document.querySelectorAll('.js-submitButton');
-        submitButton[0].addEventListener("mousedown", all_clear, false);
-        submitButton[1].addEventListener("mousedown", all_clear, false);
+        if(!submitButton[0][listenE]){
+            submitButton[0].addEventListener("mousedown", all_clear, false);
+            submitButton[0][listenE]=true; }
+        if(!submitButton[1][listenE]){
+            submitButton[1].addEventListener("mousedown", all_clear, false);
+            submitButton[1][listenE]=true; }
 
         function all_clear(){
             if(!editor_iframe){ //「HTML表示」編集画面の場合
